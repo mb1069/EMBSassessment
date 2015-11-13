@@ -42,7 +42,7 @@ public class MyNode extends TypedAtomicActor{
             try {
                 Token countToken = input.get(0);
                 int count = ((IntToken) countToken).intValue();
-                if (lastCount == 0){
+                if (lastCount == 0 && count!=lastCount){
                     lastTime = getDirector().getModelTime();
                     lastCount = count;
                 } else {
