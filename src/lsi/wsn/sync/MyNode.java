@@ -16,6 +16,7 @@ public class MyNode extends TypedAtomicActor {
     protected TypedIOPort input;
     protected TypedIOPort output;
     protected TypedIOPort feedbackOutput;
+    protected TypedIOPort channelOutput;
     protected ArrayList<Time> firingTimes = new ArrayList<Time>();
     protected int currentChannel = 11;
     protected int[] channels = {11,12,13,14,15};
@@ -28,6 +29,7 @@ public class MyNode extends TypedAtomicActor {
         input = new TypedIOPort(this, "input", true, false);
         output = new TypedIOPort(this, "output", false, true);
         feedbackOutput = new TypedIOPort(this, "output2", false, true);
+        channelOutput = new TypedIOPort(this, "channel", false, true);
         for(int channel: channels) {
             sinks.put(channel, new Sink(channel));
         }
@@ -45,25 +47,12 @@ public class MyNode extends TypedAtomicActor {
         Time currentTime = getDirector().getModelTime();
         // If any broadcasts need to be done
         if (firingTimes.contains(currentTime)) {
-            ArrayList<Broadcast> fired = new ArrayList<Broadcast>();
-            for (Broadcast b : broadcasts) {
-                if ((b.broadcastTime.getDoubleValue() == currentTime.getDoubleValue()) && (b.cutoffTime.getDoubleValue() - getDirector().getModelTime().getDoubleValue() > 0)) {
-                    System.out.println(String.format("Time: %s Channel: %s Broadcasting!", currentTime, currentChannel));
-                    setChannel(b.channel);
-                    feedbackOutput.broadcast(new IntToken(666));
-                    try {
-                        sinks.get(b.channel).numTransmitted++;
-                    } catch (NullPointerException ignored){}
-                    fired.add(b);
-                }
-            }
-            for (Broadcast b: fired){
-                broadcasts.remove(b);
-            }
-            firingTimes.remove(currentTime);
+            fireBroadcasts(currentTime);
+
+            return;
         }
 
-        //Context switches
+        //TODO Context switches
 
         try {
             Token countToken = input.get(0);
@@ -71,9 +60,11 @@ public class MyNode extends TypedAtomicActor {
                 Time time = getDirector().getModelTime();
                 int count = ((IntToken) countToken).intValue();
                 currentSink.addBeacon(new Beacon(time, count));
-                System.out.println(String.format("Time: %s Channel: %s Count %s Beacons: %s", time, currentChannel, count, currentSink.beacons.size()));
+                System.out.println(String.format("Time: %s Double time: %s Channel: %s Count %s Beacons: %s", time, time.getDoubleValue(), currentChannel, count, currentSink.beacons.size()));
+
                 if (currentSink.beacons.size()==2){
                     ArrayList<Beacon> beacons = currentSink.beacons;
+
                     Time broadcastTime = calculateBroadcastTime(beacons.get(0), beacons.get(1));
                     Time period = new Time(getDirector(), calculatePeriod(beacons.get(0), beacons.get(1)));
                     currentSink.t = period.getDoubleValue();
@@ -82,8 +73,9 @@ public class MyNode extends TypedAtomicActor {
                     broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastDeadline));
                     getDirector().fireAt(this, broadcastTime);
                     firingTimes.add(broadcastTime);
-                    //                setSinkAndChannel(pickNextChannel());
+                    setSinkAndChannel(pickNextChannel());
                     System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, currentChannel));
+
                 } else if(currentSink.beacons.size()==3){
                     System.out.println(String.format("Final count: %s, period: %s", count, currentSink.t));
                     Time broadcastTime = new Time(getDirector(), (count * currentSink.t)+time.getDoubleValue());
@@ -92,13 +84,43 @@ public class MyNode extends TypedAtomicActor {
                     broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastDeadline));
                     firingTimes.add(broadcastTime);
                     sinks.remove(currentChannel);
-                    //                setSinkAndChannel(pickNextChannel());
+                    setSinkAndChannel(pickNextChannel());
                     System.out.println(String.format("Preparing final broadcast at time: %s on channel: %s w/ >2 beacons.", broadcastTime, currentChannel));
                 }
-                output.broadcast(countToken);
+
+
+                output.broadcast(new IntToken(currentChannel));
             }
         } catch (NoTokenException e) {}
 
+    }
+
+    private void fireBroadcasts(Time currentTime) throws IllegalActionException {
+        ArrayList<Broadcast> fired = new ArrayList<Broadcast>();
+        for (Broadcast b : broadcasts) {
+            if ((b.broadcastTime.getDoubleValue() == currentTime.getDoubleValue()) && (b.cutoffTime.getDoubleValue() - getDirector().getModelTime().getDoubleValue() > 0)) {
+                System.out.println(String.format("Time: %s CutoffTime: %s Channel: %s Broadcasting!", getDirector().getModelTime(), b.cutoffTime, currentChannel));
+                setChannel(b.channel);
+                feedbackOutput.broadcast(new IntToken(666));
+                try {
+                    sinks.get(b.channel).numTransmitted++;
+                } catch (NullPointerException ignored){}
+                fired.add(b);
+            }
+        }
+        for (Broadcast b: fired){
+            broadcasts.remove(b);
+        }
+        firingTimes.remove(currentTime);
+    }
+
+    private int pickOtherChannel(int currentChannel){
+        for(Sink s: sinks.values()){
+            if (!channelHasPendingBroadcast(s.channel) && currentChannel!=s.channel){
+                return s.channel;
+            }
+        }
+        return currentChannel;
     }
 
     private int pickNextChannel(){
@@ -136,7 +158,7 @@ public class MyNode extends TypedAtomicActor {
 
     private void setChannel(int channel) throws IllegalActionException {
         currentChannel = channel;
-        output.broadcast(new IntToken(channel));
+        channelOutput.broadcast(new IntToken(channel));
     }
 
     private void toggle(boolean[] b, int index) {
