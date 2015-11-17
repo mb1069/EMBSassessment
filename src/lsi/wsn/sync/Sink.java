@@ -15,8 +15,4 @@ public class Sink{
         this.channel = channel;
     }
 
-    public void addBeacon(Beacon beacon){
-        this.beacons.add(beacon);
-    }
-
 }

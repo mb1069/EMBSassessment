@@ -1,0 +1,29 @@
+Algorithm outline
+
+Begin listening
+Record initial time
+Receive first beacon:
+	if t is known
+		Calculate last broadcast
+		Shut-off channel/associated sinks
+		Switch channel
+		
+	else if second beacon
+		Record beacon
+		//SPECIAL CASE FOR N=1 on both beacons
+		If N known
+			Attempt to find values of I that could predict 2nd broadcast
+			if only one valid I
+				create both callbacks, delete channel
+			If more than 1 valid I
+				Create first broadcast, calculate earliest callback
+				Make callback to come back to channel at next wake period (11 t after broadcast)
+		IF N not known
+			Bart's other equation
+		
+	else
+		if time elapsed since changing to channel > max period
+			Received beacon is the first of the set, therefore set N (for channel) = beacon.n
+		Record beacon
+		Make callback to come back to channel
+		

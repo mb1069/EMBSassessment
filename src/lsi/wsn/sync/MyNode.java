@@ -24,6 +24,11 @@ public class MyNode extends TypedAtomicActor {
     protected Sink currentSink;
     protected ArrayList<Broadcast> broadcasts = new ArrayList<Broadcast>();
 
+    protected Time lastChannelSwitch;
+
+    public static final double MIN_PERIOD = 0.5;
+    public static final double MAX_PERIOD = 1.5;
+
     public MyNode(CompositeEntity container, String name) throws IllegalActionException, NameDuplicationException {
         super(container, name);
         input = new TypedIOPort(this, "input", true, false);
@@ -39,6 +44,7 @@ public class MyNode extends TypedAtomicActor {
     @Override
     public void initialize() throws IllegalActionException {
         super.initialize();
+        lastChannelSwitch = getDirector().getModelTime();
     }
 
     @Override
@@ -49,62 +55,112 @@ public class MyNode extends TypedAtomicActor {
         if (firingTimes.contains(time)) {
             fireBroadcasts(time);
         }
-
         //TODO Context switches
 
         try {
             Token countToken = input.get(0);
-            if(!channelHasPendingBroadcast(currentChannel)){
-                int count = ((IntToken) countToken).intValue();
-                currentSink.addBeacon(new Beacon(time, count));
-                System.out.println(String.format("Time: %s Channel: %s Count: %s Beacons: %s", time, currentChannel, count, currentSink.beacons.size()));
-                //TODO if beacon1.n =1 listen to someting else for 12*minPeriod then switch back
-                if (currentSink.beacons.size()==2){
-                    //Generate first broadcast from 2 beacons
-                    ArrayList<Beacon> beacons = new ArrayList<Beacon>(currentSink.beacons);
-                    Time period = new Time(getDirector(), calculatePeriod(beacons.get(0), beacons.get(1)));
+            int count = ((IntToken) countToken).intValue();
+            Beacon b = new Beacon(time, count);
+            System.out.println(String.format("Time: %s Channel: %s Count: %s Beacons: %s", time, currentChannel, count, currentSink.beacons.size()));
+            if (currentSink.t!=null){
+                create2ndBroadcastUsingPeriod(currentChannel, b, currentSink.t);
+                setSinkAndChannel(pickNextChannel());
+            //If beacon is second received in stream
+            } else if (currentSink.beacons.size()==1){
+                // TODO
+                if (currentSink.N!=null){
+                    Time period = new Time(getDirector(), calculatePeriod(currentSink.beacons.get(0), currentSink.beacons.get(1)));
                     currentSink.t = period.getDoubleValue();
-                    Time broadcastTime = generateFirstBroadcast(beacons, period);
-                    //Special case where we can calculate second firing
-                    //TODO generalise to work for any interval of cycles
-                    if (beacons.get(0).n==1 && beacons.get(1).n==1){
-                        Time broadcastTime2 = broadcastTime.add(12 * period.getDoubleValue());
-                        broadcasts.add(new Broadcast(currentChannel, broadcastTime2, broadcastTime2.add(period)));
-                        firingTimes.add(broadcastTime2);
-                        getDirector().fireAt(this, broadcastTime2);
-                        System.out.println(String.format("Preparing final broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime2, currentChannel));
-                        sinks.remove(currentChannel);
-                    }
-                    setSinkAndChannel(pickNextChannel());
+                    createFirstBroadcast(currentSink.beacons, period);
+                    // attempt to generate second broadcast
+                    calculatePossiblePeriods(currentSink.beacons.get(0), b, currentSink.N);
+                } else {
 
-                } else if(currentSink.beacons.size()==3){
-                    System.out.println(String.format("Final count: %s, period: %s", count, currentSink.t));
-                    Time broadcastTime = new Time(getDirector(), (count * currentSink.t)+time.getDoubleValue());
-                    getDirector().fireAt(this, broadcastTime);
-                    Time broadcastDeadline = broadcastTime.add(new Time(getDirector(), currentSink.t));
-                    broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastDeadline));
-                    firingTimes.add(broadcastTime);
-                    sinks.remove(currentChannel);
-                    System.out.println(String.format("Preparing final broadcast at time: %s on channel: %s w/ >2 beacons.", broadcastTime, currentChannel));
-                    setSinkAndChannel(pickNextChannel());
                 }
-
-
-                output.broadcast(new IntToken(currentChannel));
+                currentSink.beacons.add(b);
+                // TODO create callback to same channel to listen to 3rd packet
+                setSinkAndChannel(pickNextChannel());
+            } else {
+                if (waitedLongerThanMinPeriod(lastChannelSwitch, time, MIN_PERIOD)){
+                    currentSink.N=b.n;
+                }
+                currentSink.beacons.add(b);
+                // TODO create callback to same channel in minPeriod
+                setSinkAndChannel(pickNextChannel());
             }
+
+//                if (currentSink.beacons.size()==2){
+//                    //Generate first broadcast from 2 beacons
+//
+//                    ArrayList<Beacon> beacons = new ArrayList<Beacon>(currentSink.beacons);
+//                    Time period = new Time(getDirector(), calculatePeriod(beacons.get(0), beacons.get(1)));
+//                    currentSink.t = period.getDoubleValue();
+//                    Time broadcastTime = createFirstBroadcast(beacons, period);
+//                    //Special case where we can calculate second firing
+//                    //TODO generalise to work for any interval of cycles
+//                    if (beacons.get(0).n==1 && beacons.get(1).n==1){
+//                        Time broadcastTime2 = broadcastTime.add(12 * period.getDoubleValue());
+//                        broadcasts.add(new Broadcast(currentChannel, broadcastTime2, broadcastTime2.add(period)));
+//                        firingTimes.add(broadcastTime2);
+//                        getDirector().fireAt(this, broadcastTime2);
+//                        System.out.println(String.format("Preparing final broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime2, currentChannel));
+//                        sinks.remove(currentChannel);
+//                    }
+//                    setSinkAndChannel(pickNextChannel());
+//
+//                } else if(currentSink.beacons.size()==3){
+//
+//                }
+
+
+            output.broadcast(new IntToken(currentChannel));
+
         } catch (NoTokenException e) {}
 
     }
 
-    private Time generateFirstBroadcast(ArrayList<Beacon> beacons, Time period) throws IllegalActionException {
+    private Double[] calculatePossiblePeriods(Beacon b1, Beacon b2, int N) {
+        double diffTime = Math.abs(b1.t.getDoubleValue() - b2.t.getDoubleValue());
+        double diffN = Math.abs(b1.n-b2.n);
+        ArrayList<Double> possiblePeriods = new ArrayList<Double>();
+        double period = Double.MAX_VALUE;
+        int i = 0;
+        while (period>MIN_PERIOD){
+            period = diffTime/(((11+N)*i)+diffN);
+            if (MIN_PERIOD<=period && period <=MAX_PERIOD){
+                possiblePeriods.add(period);
+            }
+            i++;
+
+        }
+        //TODO FINISH
+        return (Double[]) possiblePeriods.toArray();
+    }
+
+    private boolean waitedLongerThanMinPeriod(Time lastChannelSwitch, Time time, double minPeriod) {
+        return ((time.subtract(lastChannelSwitch)).getDoubleValue()-minPeriod)>0;
+    }
+
+
+    private Time createFirstBroadcast(ArrayList<Beacon> beacons, Time period) throws IllegalActionException {
         Time broadcastTime = calculateBroadcastTime(beacons.get(0), beacons.get(1));
-        System.out.println(String.format("Calculated: Period: %s, broadCastTime: %s", period, broadcastTime));
         broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastTime.add(period)));
         getDirector().fireAt(this, broadcastTime);
         firingTimes.add(broadcastTime);
         System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, currentChannel));
         return broadcastTime;
     }
+
+    private void create2ndBroadcastUsingPeriod(int currentChannel, Beacon b, Double t) throws IllegalActionException {
+        Time finalBroadcast = new Time(getDirector(), (b.n * currentSink.t)+b.t.getDoubleValue());
+        getDirector().fireAt(this, finalBroadcast);
+        Time broadcastDeadline = finalBroadcast.add(new Time(getDirector(), currentSink.t));
+        broadcasts.add(new Broadcast(currentChannel, finalBroadcast, broadcastDeadline));
+        firingTimes.add(finalBroadcast);
+        sinks.remove(currentChannel);
+        System.out.println(String.format("Preparing final broadcast at time: %s on channel: %s w/ >2 beacons.", finalBroadcast, currentChannel));
+    }
+
 
     private void fireBroadcasts(Time currentTime) throws IllegalActionException {
         ArrayList<Broadcast> fired = new ArrayList<Broadcast>();
@@ -183,10 +239,15 @@ public class MyNode extends TypedAtomicActor {
 
     public double calculatePeriod(Beacon b1, Beacon b2) throws IllegalActionException {
         double numPeriods = Math.abs(b1.n-b2.n);
+        double period;
         if (numPeriods==0 && b1.n == 1){
             //Special case for N=1
-            return Math.abs((b1.t.subtract(b2.t)).getDoubleValue())/12;
+            period =  Math.abs((b1.t.subtract(b2.t)).getDoubleValue())/12;
+        } else {
+            period =  Math.abs((b1.t.subtract(b2.t)).getDoubleValue())/numPeriods;
         }
-        return Math.abs((b1.t.subtract(b2.t)).getDoubleValue())/numPeriods;
+        System.out.println(String.format("Calculated period: %s for channel: %s", period, currentChannel));
+        return period;
+
     }
 }
