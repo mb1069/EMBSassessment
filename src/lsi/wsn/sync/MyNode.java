@@ -44,12 +44,10 @@ public class MyNode extends TypedAtomicActor {
     @Override
     public void fire() throws IllegalActionException {
         super.fire();
-        Time currentTime = getDirector().getModelTime();
+        Time time = getDirector().getModelTime();
         // If any broadcasts need to be done
-        if (firingTimes.contains(currentTime)) {
-            fireBroadcasts(currentTime);
-
-            return;
+        if (firingTimes.contains(time)) {
+            fireBroadcasts(time);
         }
 
         //TODO Context switches
@@ -57,24 +55,27 @@ public class MyNode extends TypedAtomicActor {
         try {
             Token countToken = input.get(0);
             if(!channelHasPendingBroadcast(currentChannel)){
-                Time time = getDirector().getModelTime();
                 int count = ((IntToken) countToken).intValue();
                 currentSink.addBeacon(new Beacon(time, count));
-                System.out.println(String.format("Time: %s Double time: %s Channel: %s Count %s Beacons: %s", time, time.getDoubleValue(), currentChannel, count, currentSink.beacons.size()));
-
+                System.out.println(String.format("Time: %s Channel: %s Count: %s Beacons: %s", time, currentChannel, count, currentSink.beacons.size()));
+                //TODO if beacon1.n =1 listen to someting else for 12*minPeriod then switch back
                 if (currentSink.beacons.size()==2){
-                    ArrayList<Beacon> beacons = currentSink.beacons;
-
-                    Time broadcastTime = calculateBroadcastTime(beacons.get(0), beacons.get(1));
+                    //Generate first broadcast from 2 beacons
+                    ArrayList<Beacon> beacons = new ArrayList<Beacon>(currentSink.beacons);
                     Time period = new Time(getDirector(), calculatePeriod(beacons.get(0), beacons.get(1)));
                     currentSink.t = period.getDoubleValue();
-                    System.out.println(String.format("Calculated: Period: %s, broadCastTime: %s", period, broadcastTime));
-                    Time broadcastDeadline = broadcastTime.add(period);
-                    broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastDeadline));
-                    getDirector().fireAt(this, broadcastTime);
-                    firingTimes.add(broadcastTime);
+                    Time broadcastTime = generateFirstBroadcast(beacons, period);
+                    //Special case where we can calculate second firing
+                    //TODO generalise to work for any interval of cycles
+                    if (beacons.get(0).n==1 && beacons.get(1).n==1){
+                        Time broadcastTime2 = broadcastTime.add(12 * period.getDoubleValue());
+                        broadcasts.add(new Broadcast(currentChannel, broadcastTime2, broadcastTime2.add(period)));
+                        firingTimes.add(broadcastTime2);
+                        getDirector().fireAt(this, broadcastTime2);
+                        System.out.println(String.format("Preparing final broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime2, currentChannel));
+                        sinks.remove(currentChannel);
+                    }
                     setSinkAndChannel(pickNextChannel());
-                    System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, currentChannel));
 
                 } else if(currentSink.beacons.size()==3){
                     System.out.println(String.format("Final count: %s, period: %s", count, currentSink.t));
@@ -84,8 +85,8 @@ public class MyNode extends TypedAtomicActor {
                     broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastDeadline));
                     firingTimes.add(broadcastTime);
                     sinks.remove(currentChannel);
-                    setSinkAndChannel(pickNextChannel());
                     System.out.println(String.format("Preparing final broadcast at time: %s on channel: %s w/ >2 beacons.", broadcastTime, currentChannel));
+                    setSinkAndChannel(pickNextChannel());
                 }
 
 
@@ -95,11 +96,21 @@ public class MyNode extends TypedAtomicActor {
 
     }
 
+    private Time generateFirstBroadcast(ArrayList<Beacon> beacons, Time period) throws IllegalActionException {
+        Time broadcastTime = calculateBroadcastTime(beacons.get(0), beacons.get(1));
+        System.out.println(String.format("Calculated: Period: %s, broadCastTime: %s", period, broadcastTime));
+        broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastTime.add(period)));
+        getDirector().fireAt(this, broadcastTime);
+        firingTimes.add(broadcastTime);
+        System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, currentChannel));
+        return broadcastTime;
+    }
+
     private void fireBroadcasts(Time currentTime) throws IllegalActionException {
         ArrayList<Broadcast> fired = new ArrayList<Broadcast>();
         for (Broadcast b : broadcasts) {
             if ((b.broadcastTime.getDoubleValue() == currentTime.getDoubleValue()) && (b.cutoffTime.getDoubleValue() - getDirector().getModelTime().getDoubleValue() > 0)) {
-                System.out.println(String.format("Time: %s CutoffTime: %s Channel: %s Broadcasting!", getDirector().getModelTime(), b.cutoffTime, currentChannel));
+                System.out.println(String.format("Time: %s CutoffTime: %s Channel: %s Broadcasting!", getDirector().getModelTime(), b.cutoffTime, b.channel));
                 setChannel(b.channel);
                 feedbackOutput.broadcast(new IntToken(666));
                 try {
@@ -157,6 +168,7 @@ public class MyNode extends TypedAtomicActor {
     }
 
     private void setChannel(int channel) throws IllegalActionException {
+        System.out.println(String.format("Switched from channel %s to channel %s", currentChannel, channel));
         currentChannel = channel;
         channelOutput.broadcast(new IntToken(channel));
     }
@@ -171,7 +183,10 @@ public class MyNode extends TypedAtomicActor {
 
     public double calculatePeriod(Beacon b1, Beacon b2) throws IllegalActionException {
         double numPeriods = Math.abs(b1.n-b2.n);
+        if (numPeriods==0 && b1.n == 1){
+            //Special case for N=1
+            return Math.abs((b1.t.subtract(b2.t)).getDoubleValue())/12;
+        }
         return Math.abs((b1.t.subtract(b2.t)).getDoubleValue())/numPeriods;
     }
-
 }
