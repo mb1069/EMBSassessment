@@ -69,24 +69,32 @@ public class MyNode extends TypedAtomicActor {
             } else if (currentSink.beacons.size()==1){
                 // TODO
                 if (currentSink.N!=null){
-                    Time period = new Time(getDirector(), calculatePeriod(currentSink.beacons.get(0), currentSink.beacons.get(1)));
-                    currentSink.t = period.getDoubleValue();
-                    createFirstBroadcast(currentSink.beacons, period);
+//                    Time period = new Time(getDirector(), calculatePeriod(currentSink.beacons.get(0), currentSink.beacons.get(1)));
+//                    currentSink.t = period.getDoubleValue();
+//                    Time broadcast = createFirstBroadcast(currentSink.beacons, period);
                     // attempt to generate second broadcast
-                    calculatePossiblePeriods(currentSink.beacons.get(0), b, currentSink.N);
+                    ArrayList<Double> possiblePeriods = calculatePossiblePeriods(currentSink.beacons.get(0), b, currentSink.N);
+                    if (possiblePeriods.size()==1){
+                        double period = possiblePeriods.get(0);
+                        Time broadcast = createFirstBroadcast(currentSink.beacons.get(0), b, period);
+                        create2ndBroadcastUsingBroadcast(broadcast, period, currentSink.N);
+                    } else {
+                        //TODO finish if possible period not estimated....
+
+                    }
                 } else {
 
                 }
                 currentSink.beacons.add(b);
                 // TODO create callback to same channel to listen to 3rd packet
-                setSinkAndChannel(pickNextChannel());
+//                setSinkAndChannel(pickNextChannel());
             } else {
                 if (waitedLongerThanMinPeriod(lastChannelSwitch, time, MIN_PERIOD)){
                     currentSink.N=b.n;
                 }
                 currentSink.beacons.add(b);
                 // TODO create callback to same channel in minPeriod
-                setSinkAndChannel(pickNextChannel());
+//                setSinkAndChannel(pickNextChannel());
             }
 
 //                if (currentSink.beacons.size()==2){
@@ -119,7 +127,16 @@ public class MyNode extends TypedAtomicActor {
 
     }
 
-    private Double[] calculatePossiblePeriods(Beacon b1, Beacon b2, int N) {
+    private Time create2ndBroadcastUsingBroadcast(Time broadcast, Double period, Integer n) throws IllegalActionException {
+        Time broadcastTime = new Time(getDirector(), broadcast.getDoubleValue()+((11+n)*period));
+        broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastTime.add(period)));
+        getDirector().fireAt(this, broadcastTime);
+        firingTimes.add(broadcastTime);
+        System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, currentChannel));
+        return broadcastTime;
+    }
+
+    private ArrayList<Double> calculatePossiblePeriods(Beacon b1, Beacon b2, int N) {
         double diffTime = Math.abs(b1.t.getDoubleValue() - b2.t.getDoubleValue());
         double diffN = Math.abs(b1.n-b2.n);
         ArrayList<Double> possiblePeriods = new ArrayList<Double>();
@@ -131,10 +148,8 @@ public class MyNode extends TypedAtomicActor {
                 possiblePeriods.add(period);
             }
             i++;
-
         }
-        //TODO FINISH
-        return (Double[]) possiblePeriods.toArray();
+        return possiblePeriods;
     }
 
     private boolean waitedLongerThanMinPeriod(Time lastChannelSwitch, Time time, double minPeriod) {
@@ -142,8 +157,8 @@ public class MyNode extends TypedAtomicActor {
     }
 
 
-    private Time createFirstBroadcast(ArrayList<Beacon> beacons, Time period) throws IllegalActionException {
-        Time broadcastTime = calculateBroadcastTime(beacons.get(0), beacons.get(1));
+    private Time createFirstBroadcast(Beacon b1, Beacon b2,  Double period) throws IllegalActionException {
+        Time broadcastTime = calculateBroadcastTime(b1, b2);
         broadcasts.add(new Broadcast(currentChannel, broadcastTime, broadcastTime.add(period)));
         getDirector().fireAt(this, broadcastTime);
         firingTimes.add(broadcastTime);
