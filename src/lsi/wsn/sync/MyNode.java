@@ -43,8 +43,8 @@ public class MyNode extends TypedAtomicActor {
     @Override
     public void initialize() throws IllegalActionException {
         super.initialize();
-        setSinkAndChannel(currentChannel);
         lastChannelSwitch = getDirector().getModelTime();
+        setSinkAndChannel(currentChannel, lastChannelSwitch);
     }
 
     @Override
@@ -56,7 +56,7 @@ public class MyNode extends TypedAtomicActor {
         if (broadcastsAtTime.size()>0) {
             int saveChannel = currentChannel;
             for(Broadcast b: fireBroadcasts(time, broadcastsAtTime)){
-//                broadcasts.remove(b);
+                broadcasts.remove(b);
             }
             createChannelSwitchCallBack(time.add(microDelay/2), saveChannel);
             return;
@@ -64,20 +64,25 @@ public class MyNode extends TypedAtomicActor {
 
         ChannelSwitch cs = timeInChannelSwitches(time, channelSwitches);
         if (cs!=null){
-            setSinkAndChannel(cs.channel);
+            setSinkAndChannel(cs.channel, time);
             channelSwitches.remove(cs);
         }
 
-        if (input.hasToken(0) && this.sinks.size()>0){
+        if (time.getDoubleValue()==14.5){
+            System.out.println("a");
+        }
+        if (input.hasToken(0) && this.sinks.containsKey(currentChannel)){
             Token countToken = input.get(0);
             int count = ((IntToken) countToken).intValue();
             Beacon b = new Beacon(time, count);
+            System.out.println(String.format("Time: %s Channel: %s", time, currentChannel));
             System.out.println(String.format("Time: %s Channel: %s Count: %s Beacons: %s", time, currentChannel, count, currentSink.beacons.size()+1));
             if (currentSink.t!=null){
                 create2ndBroadcastUsingPeriod(b, currentChannel, currentSink.t);
-                setSinkAndChannel(pickNextChannel());
+                setSinkAndChannel(pickNextChannel(), time);
                 //If beacon is second received in stream
             } else if (currentSink.beacons.size()==1){
+                //TODO deal with N=Null case with 2 beacons
                 double period = calculatePossiblePeriods(currentSink.beacons.get(0), b, currentSink.N);
                 currentSink.t=period;
                 // generate first broadcast
@@ -86,25 +91,27 @@ public class MyNode extends TypedAtomicActor {
                     //  generate second broadcast
                     create2ndBroadcastUsingPreviousBroadcast(broadcast, period, currentChannel, currentSink.N);
                     deleteSink(currentChannel);
-                    setSinkAndChannel(pickNextChannel());
+                    setSinkAndChannel(pickNextChannel(), time);
                 } else {
                     //Generate callback to earliest possible beacon
                     Time nextBeaconTime = calculateChannelCallbackOfNextSeries(b, period);
                     createChannelSwitchCallBack(nextBeaconTime, currentChannel);
                     currentSink.beacons.add(b);
-                    setSinkAndChannel(pickNextChannel());
+                    setSinkAndChannel(pickNextChannel(), time);
                 }
 
             } else {
-                if (waitedLongerThanMinPeriod(lastChannelSwitch, time, MIN_PERIOD)){
+                if (waitedLongerThanMinPeriod(time, lastChannelSwitch, MIN_PERIOD) && b.n==1){
                     currentSink.N=b.n;
+                    Time waited = time.subtract(lastChannelSwitch);
+                    createChannelSwitchCallBack(time.add(waited),currentChannel);
+                } else {
+                    createChannelSwitchCallBack(time.add(MIN_PERIOD),currentChannel);
                 }
                 currentSink.beacons.add(b);
-                // TODO create callback to same channel in minPeriod
-                createChannelSwitchCallBack(time.add(MIN_PERIOD),currentChannel);
                 int channel = tryPickDifferentChannel(currentChannel);
                 if (channel!=currentChannel){
-                    setSinkAndChannel(channel);
+                    setSinkAndChannel(channel, time);
                 }
             }
 
@@ -169,7 +176,7 @@ public class MyNode extends TypedAtomicActor {
         ArrayList<Broadcast> fired = new ArrayList<Broadcast>();
         for (Broadcast b : scheduledBroadcasts) {
             if ((b.broadcastTime.getDoubleValue() == currentTime.getDoubleValue()) && (b.cutoffTime.getDoubleValue() - getDirector().getModelTime().getDoubleValue() > 0)) {
-                setChannel(b.channel);
+                setChannel(b.channel, currentTime);
                 System.out.println(String.format("Time: %s CutoffTime: %s Channel: %s Broadcasting!", getDirector().getModelTime(), b.cutoffTime, b.channel));
                 feedbackOutput.send(0, new IntToken(666));
                 try {
@@ -210,14 +217,15 @@ public class MyNode extends TypedAtomicActor {
         return false;
     }
 
-    private void setSinkAndChannel(int channel) throws IllegalActionException {
+    private void setSinkAndChannel(int channel, Time time) throws IllegalActionException {
         currentSink = sinks.get(channel);
-        setChannel(channel);
+        setChannel(channel, time);
     }
 
-    private void setChannel(int channel) throws IllegalActionException {
+    private void setChannel(int channel, Time time) throws IllegalActionException {
         System.out.println(String.format("Time: %s Switched from channel %s to channel %s", getDirector().getModelTime(), currentChannel, channel));
         currentChannel = channel;
+        lastChannelSwitch = time;
         channelOutput.send(0, new IntToken(channel));
     }
 
@@ -247,12 +255,13 @@ public class MyNode extends TypedAtomicActor {
     }
 
 
+
     //Boolean managed to schedule task
     private boolean setupBroadcastAndCallBack(Time broadcastTime, Time deadline, int channel, double t) throws IllegalActionException {
         ArrayList<Broadcast> bAtTime = timeInBroadcasts(broadcastTime, broadcasts);
         if (bAtTime.size()>0){
-            if (broadcastTime.subtract(deadline).getDoubleValue()>0){
-                return setupBroadcastAndCallBack(broadcastTime, deadline, channel, t);
+            if (deadline.subtract(broadcastTime).getDoubleValue()>microDelay){
+                return setupBroadcastAndCallBack(broadcastTime.add(microDelay), deadline, channel, t);
             } else {
                 System.out.println(String.format("Failed to schedule broadcast for channel: %s at time: %s:",channel, broadcastTime));
                 return false;
@@ -273,7 +282,7 @@ public class MyNode extends TypedAtomicActor {
         }
         Broadcast b = new Broadcast(channel, broadcastTime, deadline);
         getDirector().fireAt(this, broadcastTime);
-        System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, channel));
+        System.out.println(String.format("Preparing broadcast on channel: %s at time: %s w/ 2 beacons.", channel, broadcastTime));
         broadcasts.add(b);
         return true;
     }
@@ -339,7 +348,7 @@ public class MyNode extends TypedAtomicActor {
         return new Time(getDirector(), listenTime);
     }
 
-    private boolean waitedLongerThanMinPeriod(Time lastChannelSwitch, Time time, double minPeriod) {
+    private boolean waitedLongerThanMinPeriod(Time time, Time lastChannelSwitch, double minPeriod) {
         return ((time.subtract(lastChannelSwitch)).getDoubleValue()-minPeriod)>0;
     }
 
