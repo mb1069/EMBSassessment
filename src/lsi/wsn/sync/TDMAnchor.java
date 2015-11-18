@@ -47,6 +47,11 @@ public class TDMAnchor extends TypedAtomicActor{
 	protected EllipseAttribute _circle;
 	protected EditorIcon node_icon;
 
+    protected int correctReceived =0;
+    protected int wrongReceived =0;
+
+
+
 	public TDMAnchor(CompositeEntity container, String name)
 			throws NameDuplicationException, IllegalActionException  {
 
@@ -110,13 +115,17 @@ public class TDMAnchor extends TypedAtomicActor{
 			//read token
 			input.get(0);
 			if(state==TDMAnchor.RX){ // if in receiving period
+                correctReceived++;
 				// turn on the green LED
 				this.setLED(TDMAnchor.GREEN);
 			}else{
 				// turn on the red LED
+                wrongReceived++;
 				this.setLED(TDMAnchor.RED);
 			}
-		}
+            System.out.println("!!"+output.getOutsideChannel());
+            System.out.println(String.format("RECEIVED BEACON  at time: %s %s/%s", curTime, correctReceived, wrongReceived));
+        }
 	}
 
 
@@ -124,23 +133,24 @@ public class TDMAnchor extends TypedAtomicActor{
 
 	// main protocol state machine 
 	protected void changeState() throws IllegalActionException{
+        System.out.println("!!" + output.getOutsideChannel());
 
 		if(state==TDMAnchor.SLEEP){ // transition from sleep to sync, set number of sync beacons, triggers the first beacon transmission
-
+            System.out.println(String.format("Sink is emitting at time: %s", getDirector().getModelTime()));
 			state=TDMAnchor.SYNC;
 			syncCount=n;
 			sendBeacon();
 
 		}
 		else if(state==TDMAnchor.SYNC){ // transition from sync to rx
-
+            System.out.println(String.format("Sink is receiving at time: %s", getDirector().getModelTime()));
 			state = TDMAnchor.RX;
 			nextFire = getDirector().getModelTime().add(t); // next scheduled firing in t time units
 			getDirector().fireAt(this, nextFire);
 
 		}
 		else if(state==TDMAnchor.RX){ // transition from rx to sleep 
-
+            System.out.println(String.format("Sink is sleeping at time: %s", getDirector().getModelTime()));
 			this.setLED(TDMAnchor.BLACK);			// turn off the LED
 
 			state = TDMAnchor.SLEEP;
