@@ -133,24 +133,24 @@ public class TDMAnchor extends TypedAtomicActor{
 
 	// main protocol state machine 
 	protected void changeState() throws IllegalActionException{
-        System.out.println("!!" + output.getOutsideChannel());
+//        System.out.println("!!" + output.getOutsideChannel());
 
 		if(state==TDMAnchor.SLEEP){ // transition from sleep to sync, set number of sync beacons, triggers the first beacon transmission
-            System.out.println(String.format("Sink is emitting at time: %s", getDirector().getModelTime()));
+//            System.out.println(String.format("Sink is emitting at time: %s", getDirector().getModelTime()));
 			state=TDMAnchor.SYNC;
 			syncCount=n;
 			sendBeacon();
 
 		}
 		else if(state==TDMAnchor.SYNC){ // transition from sync to rx
-            System.out.println(String.format("Sink is receiving at time: %s", getDirector().getModelTime()));
+//            System.out.println(String.format("Sink is receiving at time: %s", getDirector().getModelTime()));
 			state = TDMAnchor.RX;
 			nextFire = getDirector().getModelTime().add(t); // next scheduled firing in t time units
 			getDirector().fireAt(this, nextFire);
 
 		}
 		else if(state==TDMAnchor.RX){ // transition from rx to sleep 
-            System.out.println(String.format("Sink is sleeping at time: %s", getDirector().getModelTime()));
+//            System.out.println(String.format("Sink is sleeping at time: %s", getDirector().getModelTime()));
 			this.setLED(TDMAnchor.BLACK);			// turn off the LED
 
 			state = TDMAnchor.SLEEP;

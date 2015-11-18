@@ -11,17 +11,15 @@ Receive first beacon:
 	else if second beacon
 		Record beacon
 		//SPECIAL CASE FOR N=1 on both beacons
+		Calculate Period
+		
 		If N known
-			Attempt to find values of I that could predict 2nd broadcast
-			If only one valid I
-				create both callbacks, delete channel
-			If more than 1 valid I
-				//TO FIGURE OUT
-				Create first broadcast, calculate earliest callback
-				Make callback to come back to channel at next wake period (11 t after broadcast)
+			create both callbacks, delete channel
 		IF N not known
-			Bart's other equation
-			//TO FIGURE OUT IF FROM DIFFERENT CYCLES
+			//TO FIGURE OUT
+			Create first broadcast, calculate earliest callback
+			Make callback to come back to channel at next wake period (11 t after broadcast)
+
 	else
 		if time elapsed since changing to channel > max period
 			Received beacon is the first of the set, therefore set N (for channel) = beacon.n
