@@ -18,11 +18,11 @@ public class MyNode extends TypedAtomicActor {
     protected TypedIOPort channelOutput;
     protected ArrayList<ChannelSwitch> channelSwitches = new ArrayList<ChannelSwitch>();
     protected int currentChannel = 15;
-    protected int[] channels = {11,12,13,14,15};
+    protected int[] channels = {11, 12, 13, 14, 15};
     protected HashMap<Integer, Sink> sinks = new HashMap<Integer,Sink>();
     protected Sink currentSink;
     protected ArrayList<Broadcast> broadcasts = new ArrayList<Broadcast>();
-    protected double microDelay = 0.01;
+    protected double microDelay = 0.001;
     protected Time lastChannelSwitch;
 
     public static final double MIN_PERIOD = 0.5;
@@ -51,18 +51,14 @@ public class MyNode extends TypedAtomicActor {
     public void fire() throws IllegalActionException {
         super.fire();
         Time time = getDirector().getModelTime();
-        if (time.getDoubleValue()==60.0){
-            System.out.println();
-        }
         // If any broadcasts need to be done
         ArrayList<Broadcast> broadcastsAtTime = timeInBroadcasts(time, broadcasts);
         if (broadcastsAtTime.size()>0) {
             int saveChannel = currentChannel;
-            //TODO handle channel syncing with multiple broadcasts at same time
             for(Broadcast b: fireBroadcasts(time, broadcastsAtTime)){
 //                broadcasts.remove(b);
             }
-            createChannelSwitchCallBack(time.add(0.00001), saveChannel);
+            createChannelSwitchCallBack(time.add(microDelay/2), saveChannel);
             return;
         }
 
@@ -226,59 +222,81 @@ public class MyNode extends TypedAtomicActor {
     }
 
     private Time createEarliestPossibleBroadcast(Beacon b1, Beacon b2, int channel, double t) throws IllegalActionException {
-        Time broadcastTime = new Time(getDirector(), calculatePeriod(b1, b2)*(Math.min(b1.n, b2.n))).add(getDirector().getModelTime()).add(microDelay);
+        Time broadcastTime = new Time(getDirector(), calculatePeriod(b1, b2)*(Math.min(b1.n, b2.n))).add(getDirector().getModelTime());
         setupBroadcastAndCallBack(broadcastTime, broadcastTime.add(t), channel, t);
         System.out.println("  1st broadcast.");
         return broadcastTime;
     }
 
     private void create2ndBroadcastUsingPeriod(Beacon b, int channel, double t) throws IllegalActionException {
-        Time broadcast = new Time(getDirector(), (b.n * t)+b.t.getDoubleValue()).add(microDelay);
+        Time broadcast = new Time(getDirector(), (b.n * t)+b.t.getDoubleValue());
         Time deadline = broadcast.add(new Time(getDirector(), t));
         if (setupBroadcastAndCallBack(broadcast, deadline, channel, t)) {
             deleteSink(channel);
             System.out.println("  2nd broadcast w/ 3 beacons.");
-        } else {
-            System.out.println("Failed to schedule broadcast for channel: " + channel);
         }
-
     }
 
-    private Time create2ndBroadcastUsingPreviousBroadcast(Time previousBroadcast, double t, int channel, Integer n) throws IllegalActionException {
-        Time broadcast = new Time(getDirector(), previousBroadcast.getDoubleValue()+((11+n)*t)).add(microDelay);
+    private void create2ndBroadcastUsingPreviousBroadcast(Time previousBroadcast, double t, int channel, Integer n) throws IllegalActionException {
+        Time broadcast = new Time(getDirector(), previousBroadcast.getDoubleValue()+((11+n)*t));
         Time deadline = broadcast.add(new Time(getDirector(), t));
-        setupBroadcastAndCallBack(broadcast, deadline, channel, t);
         if (setupBroadcastAndCallBack(broadcast, deadline, channel, t)) {
             deleteSink(channel);
             System.out.println("  2nd broadcast w/ 2 beacons.");
-        } else {
-            System.out.println("Failed to schedule broadcast for channel: " + channel);
         }
-        return broadcast;
     }
 
+
     //Boolean managed to schedule task
-    private boolean setupBroadcastAndCallBack(Time broadcastTime, Time broadcastDeadline, int channel, double t) throws IllegalActionException {
-        Broadcast b = new Broadcast(channel, broadcastTime, broadcastDeadline, t);
+    private boolean setupBroadcastAndCallBack(Time broadcastTime, Time deadline, int channel, double t) throws IllegalActionException {
         ArrayList<Broadcast> bAtTime = timeInBroadcasts(broadcastTime, broadcasts);
         if (bAtTime.size()>0){
-            Broadcast compatibleB = reArrangeSimultaneousBroadCasts(b, bAtTime);
-            if (compatibleB != null) {
-                b = compatibleB;
+            if (broadcastTime.subtract(deadline).getDoubleValue()>0){
+                return setupBroadcastAndCallBack(broadcastTime, deadline, channel, t);
             } else {
+                System.out.println(String.format("Failed to schedule broadcast for channel: %s at time: %s:",channel, broadcastTime));
                 return false;
             }
+//            if (checkAllBroadcastsMeetDeadline(bAtTime, microDelay)){
+//                broadcasts.removeAll(bAtTime);
+//                for (Broadcast b: bAtTime){
+//                    b.broadcastTime.add(microDelay);
+//                }
+//                broadcasts.addAll(bAtTime);
+//                getDirector().fireAt(this, getLatestBroadcastTime(bAtTime));
+//                return true;
+//            } else {
+//                return false;
+//            }
+
+
         }
+        Broadcast b = new Broadcast(channel, broadcastTime, deadline);
         getDirector().fireAt(this, broadcastTime);
         System.out.println(String.format("Preparing broadcast at time: %s channel: %s w/ 2 beacons.", broadcastTime, channel));
         broadcasts.add(b);
         return true;
     }
 
-    private Broadcast reArrangeSimultaneousBroadCasts(Broadcast b, ArrayList<Broadcast> bAtTime) {
-
+    private Time getLatestBroadcastTime(ArrayList<Broadcast> broadcasts) throws IllegalActionException {
+        double time = 0.0;
+        for (Broadcast b: broadcasts){
+            double value = b.broadcastTime.getDoubleValue();
+            if (value>time){
+                time = value;
+            }
+        }
+        return new Time(getDirector(), time);
     }
 
+    private boolean checkAllBroadcastsMeetDeadline(ArrayList<Broadcast> broadcasts, double delay){
+        for (Broadcast b: broadcasts){
+            if (b.broadcastTime.getDoubleValue()+delay<b.cutoffTime.getDoubleValue()){
+                return false;
+            }
+        }
+        return true;
+    }
 
 
     public double calculatePeriod(Beacon b1, Beacon b2) throws IllegalActionException {
