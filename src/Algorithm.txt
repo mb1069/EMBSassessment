@@ -11,9 +11,9 @@ Receive first beacon:
 	else if second beacon
 		Record beacon
 		//SPECIAL CASE FOR N=1 on both beacons
-		Calculate Period
 		
 		If N known
+		Calculate Period
 			create both callbacks, delete channel
 		IF N not known
 			//TO FIGURE OUT

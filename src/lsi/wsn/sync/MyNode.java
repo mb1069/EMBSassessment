@@ -82,18 +82,20 @@ public class MyNode extends TypedAtomicActor {
                 setSinkAndChannel(pickNextChannel(), time);
                 //If beacon is second received in stream
             } else if (currentSink.beacons.size()==1){
-                //TODO deal with N=Null case with 2 beacons
-                double period = calculatePossiblePeriods(currentSink.beacons.get(0), b, currentSink.N);
-                currentSink.t=period;
+
+
                 // generate first broadcast
-                Time broadcast = createEarliestPossibleBroadcast(currentSink.beacons.get(0), b, currentChannel, period);
+                Time broadcast = createEarliestPossibleBroadcast(currentSink.beacons.get(0), b, currentChannel);
                 if (currentSink.N!=null){
                     //  generate second broadcast
+                    double period = calculatePossiblePeriods(currentSink.beacons.get(0), b, currentSink.N);
+                    currentSink.t=period;
                     create2ndBroadcastUsingPreviousBroadcast(broadcast, period, currentChannel, currentSink.N);
                     deleteSink(currentChannel);
                     setSinkAndChannel(pickNextChannel(), time);
                 } else {
                     //Generate callback to earliest possible beacon
+                    //TODO deal with N=Null case with 2 beacons
                     Time nextBeaconTime = calculateChannelCallbackOfNextSeries(b, period);
                     createChannelSwitchCallBack(nextBeaconTime, currentChannel);
                     currentSink.beacons.add(b);
@@ -229,9 +231,10 @@ public class MyNode extends TypedAtomicActor {
         channelOutput.send(0, new IntToken(channel));
     }
 
-    private Time createEarliestPossibleBroadcast(Beacon b1, Beacon b2, int channel, double t) throws IllegalActionException {
+    private Time createEarliestPossibleBroadcast(Beacon b1, Beacon b2, int channel) throws IllegalActionException {
         Time broadcastTime = new Time(getDirector(), calculatePeriod(b1, b2)*(Math.min(b1.n, b2.n))).add(getDirector().getModelTime());
-        setupBroadcastAndCallBack(broadcastTime, broadcastTime.add(t), channel, t);
+        Time deadline = broadcastTime.add(MIN_PERIOD);
+        setupBroadcastAndCallBack(broadcastTime, deadline, channel);
         System.out.println("  1st broadcast.");
         return broadcastTime;
     }
@@ -239,7 +242,7 @@ public class MyNode extends TypedAtomicActor {
     private void create2ndBroadcastUsingPeriod(Beacon b, int channel, double t) throws IllegalActionException {
         Time broadcast = new Time(getDirector(), (b.n * t)+b.t.getDoubleValue());
         Time deadline = broadcast.add(new Time(getDirector(), t));
-        if (setupBroadcastAndCallBack(broadcast, deadline, channel, t)) {
+        if (setupBroadcastAndCallBack(broadcast, deadline, channel)) {
             deleteSink(channel);
             System.out.println("  2nd broadcast w/ 3 beacons.");
         }
@@ -248,7 +251,7 @@ public class MyNode extends TypedAtomicActor {
     private void create2ndBroadcastUsingPreviousBroadcast(Time previousBroadcast, double t, int channel, Integer n) throws IllegalActionException {
         Time broadcast = new Time(getDirector(), previousBroadcast.getDoubleValue()+((11+n)*t));
         Time deadline = broadcast.add(new Time(getDirector(), t));
-        if (setupBroadcastAndCallBack(broadcast, deadline, channel, t)) {
+        if (setupBroadcastAndCallBack(broadcast, deadline, channel)) {
             deleteSink(channel);
             System.out.println("  2nd broadcast w/ 2 beacons.");
         }
@@ -257,11 +260,11 @@ public class MyNode extends TypedAtomicActor {
 
 
     //Boolean managed to schedule task
-    private boolean setupBroadcastAndCallBack(Time broadcastTime, Time deadline, int channel, double t) throws IllegalActionException {
+    private boolean setupBroadcastAndCallBack(Time broadcastTime, Time deadline, int channel) throws IllegalActionException {
         ArrayList<Broadcast> bAtTime = timeInBroadcasts(broadcastTime, broadcasts);
         if (bAtTime.size()>0){
             if (deadline.subtract(broadcastTime).getDoubleValue()>microDelay){
-                return setupBroadcastAndCallBack(broadcastTime.add(microDelay), deadline, channel, t);
+                return setupBroadcastAndCallBack(broadcastTime.add(microDelay), deadline, channel);
             } else {
                 System.out.println(String.format("Failed to schedule broadcast for channel: %s at time: %s:",channel, broadcastTime));
                 return false;
