@@ -124,7 +124,7 @@ public class TDMAnchor extends TypedAtomicActor{
 				this.setLED(TDMAnchor.RED);
 			}
             System.out.println("!!"+output.getOutsideChannel());
-            System.out.println(String.format("RECEIVED BEACON  at time: %s %s/%s", curTime, correctReceived, wrongReceived));
+            System.out.println(String.format("RECEIVED BEACON  at time: %s %s/%s", getDirector().getModelTime(), correctReceived, wrongReceived));
         }
 	}
 

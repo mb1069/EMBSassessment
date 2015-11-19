@@ -26,7 +26,7 @@ public class MyNode extends TypedAtomicActor {
     protected double lastChannelSwitch;
 
     public static final int N_MAX = 10;
-    public static final double T_MIN = 0.5;
+    public static final double tttt_MIN = 0.5;
     public static final double T_MAX = 1.5;
 
 
@@ -54,9 +54,7 @@ public class MyNode extends TypedAtomicActor {
         double currentTime = getDirector().getModelTime().getDoubleValue();
         System.out.println("Time: "+currentTime);
         // If any broadcasts need to be done
-//        if (currentTime==14.0){
-//            System.out.print("");
-//        }
+
         ArrayList<Broadcast> broadcastsAtTime = timeInBroadcasts(currentTime, broadcasts);
         if (broadcastsAtTime.size() > 0) {
             int channel = currentChannel;
@@ -66,6 +64,13 @@ public class MyNode extends TypedAtomicActor {
             createChannelSwitchCallBack( currentTime+microDelay, channel);
         }
 
+//        ChannelSwitch cs = timeInChannelSwitches(currentTime, channelSwitches);
+//        if (cs!=null){
+//            System.out.println(String.format("Time: %s Switching to channel:%s", currentTime, cs.channel));
+//            setSinkAndChannel(cs.channel, currentTime);
+//            return;
+//        }
+
         if (input.hasToken(0) && sinks.containsKey(currentChannel)) {
             Token countToken = input.get(0);
             int count = ((IntToken) countToken).intValue();
@@ -73,8 +78,7 @@ public class MyNode extends TypedAtomicActor {
             sinks.get(currentChannel).beacons.add(b);
             System.out.println(String.format("Time: %s Channel: %s Received beacon n: %s w/ count: %s ", currentTime, currentChannel, sinks.get(currentChannel).beacons.size(), b.n));
 
-
-//            if (waitedLongerThanMinPeriod(currentTime, lastChannelSwitch, T_MIN)) {
+//            if (waitedLongerThanMinPeriod(currentTime, lastChannelSwitch, tttt_MIN)) {
 //                sinks.get(currentChannel).N = b.n;
 //            }
 //            if (sinks.get(currentChannel).T != null) {
@@ -124,12 +128,12 @@ public class MyNode extends TypedAtomicActor {
         int diffN = b1.n-b2.n;
 
         int maxObservedN = Math.max(b1.n, b2.n);
-        int maxI = (int) Math.floor(diffT/(11*T_MIN));
+        int maxI = (int) Math.floor(diffT/(11* tttt_MIN));
 
         for (int i=0; i<=maxI; i++){
             for (int n=maxObservedN; n<=N_MAX; n++){
                 double period = diffT/(double)(((11+n)*i)+diffN);
-                if (T_MIN<=period && period <=T_MAX) {
+                if (tttt_MIN <=period && period <=T_MAX) {
                     sps.add(new SinkProperties(n, period));
                 }
             }
@@ -171,9 +175,9 @@ public class MyNode extends TypedAtomicActor {
         ArrayList<Double> possiblePeriods = new ArrayList<Double>();
         double period = Double.MAX_VALUE;
         int i = 0;
-        while (period > T_MIN) {
+        while (period > tttt_MIN) {
             period = diffTime / (((11 + N) * i) + diffN);
-            if (T_MIN <= period && period <= T_MAX) {
+            if (tttt_MIN <= period && period <= T_MAX) {
                 possiblePeriods.add(period);
             }
             i++;
@@ -216,9 +220,6 @@ public class MyNode extends TypedAtomicActor {
     }
 
     private int pickNextChannel(int currentChannel) {
-        if (currentChannel==12){
-            System.out.print(" ");
-        }
         for (Sink s : sinks.values()) {
             if (!channelHasPendingBroadcast(s.channel) && !sinks.get(s.channel).completed && s.channel!=currentChannel) {
                 return s.channel;
@@ -249,7 +250,7 @@ public class MyNode extends TypedAtomicActor {
 
     private double createEarliestPossibleBroadcast(Beacon b1, Beacon b2, int channel, double period, double currentTime) throws IllegalActionException {
         double broadcastTime = period * (Math.min(b1.n, b2.n)) + currentTime;
-        double deadline = broadcastTime + T_MIN;
+        double deadline = broadcastTime + tttt_MIN;
         setupBroadcastAndCallBack(broadcastTime, deadline, channel);
         System.out.println("  1st broadcast.");
         return broadcastTime;
@@ -350,10 +351,10 @@ public class MyNode extends TypedAtomicActor {
 
     private void createChannelSwitchCallBack(double t, int c) throws IllegalActionException {
         if (timeInBroadcasts(t, broadcasts).size() > 0) {
-            t += T_MIN;
+            t += tttt_MIN;
         }
         if (timeInChannelSwitches(t, channelSwitches) != null) {
-            t += T_MIN;
+            t += tttt_MIN;
         }
         System.out.println(String.format("Time: %s created channel SC at time %s for channel %s", getDirector().getModelTime(), t, c));
         channelSwitches.add(new ChannelSwitch(t, c));
