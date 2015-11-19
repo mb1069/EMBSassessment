@@ -12,6 +12,7 @@ public class Sink{
     public Set<SinkProperties> possibleProperties;
     public boolean completed = false;
     public int plannedBroadcasts;
+    public double lastBeaconTime;
 
     public Sink(int channel) {
         this.channel = channel;
