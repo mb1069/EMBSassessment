@@ -54,6 +54,7 @@ public class TDMAnchor extends TypedAtomicActor{
 	protected EllipseAttribute _circle; 
 	protected EditorIcon node_icon;
 	private int correctReceived = 0;
+	private int wrongReceived = 0;
 
 
 	public TDMAnchor(CompositeEntity container, String name)
@@ -135,17 +136,16 @@ public class TDMAnchor extends TypedAtomicActor{
 				// turn on the green LED
 				this.setLED(TDMAnchor.GREEN);
 				correctReceived++;
-				System.out.println("CORRECT RECEIVE "+correctReceived + "/2");
 			}
 			
 			else{
 				
 				// turn on the red LED
 				this.setLED(TDMAnchor.RED);
-				System.out.println("WRONG RECEIVED");
+				wrongReceived++;
 				
 			}
-			
+			System.out.println("CORRECT RECEIVE "+correctReceived + "/"+wrongReceived);
 		}
 		
 	}
