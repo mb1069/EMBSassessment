@@ -2,7 +2,10 @@ Algorithm outline
 
 Begin listening
 Record initial time
-Receive first beacon:
+Receive beacon:
+	if time elapsed since changing to channel > max period
+		Received beacon is the first of the set, therefore set N (for channel) = beacon.n
+
 	if t is known
 		Calculate last broadcast
 		Shut-off channel/associated sinks
@@ -16,13 +19,12 @@ Receive first beacon:
 		Calculate Period
 			create both callbacks, delete channel
 		IF N not known
-			//TO FIGURE OUT
-			Create first broadcast, calculate earliest callback
+			Create set of possible pairs of n and T, intersect with previous values
+			If single possible value, assign to sink and create both broadcasts
+			Else:
 			Make callback to come back to channel at next wake period (11 t after broadcast)
 
 	else
-		if time elapsed since changing to channel > max period
-			Received beacon is the first of the set, therefore set N (for channel) = beacon.n
 		Record beacon
 		Make callback to come back to channel
 		

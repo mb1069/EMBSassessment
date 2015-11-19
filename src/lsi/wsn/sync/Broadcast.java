@@ -8,10 +8,10 @@ import ptolemy.actor.util.Time;
 
 public class Broadcast implements Comparable{
     public int channel;
-    public Time broadcastTime;
-    public Time cutoffTime;
+    public double broadcastTime;
+    public double cutoffTime;
 
-    public Broadcast(int channel, Time broadcastTime, Time cutoffTime) {
+    public Broadcast(int channel, double broadcastTime, double cutoffTime) {
         this.channel = channel;
         this.broadcastTime = broadcastTime;
         this.cutoffTime = cutoffTime;
@@ -21,6 +21,6 @@ public class Broadcast implements Comparable{
     @Override
     public int compareTo(Object o) {
         Broadcast b = (Broadcast) o;
-        return (int) Math.ceil(b.cutoffTime.getDoubleValue()-b.cutoffTime.getDoubleValue());
+        return (int) Math.ceil(b.cutoffTime-b.cutoffTime);
     }
 }

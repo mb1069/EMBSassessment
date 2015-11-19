@@ -24,7 +24,7 @@ public class TDMAnchor extends TypedAtomicActor{
 	protected Parameter pn; // number of beacons of sync phase
 	protected int state; // protocol state
 
-	private double t; // private variable storing the parameter t, updated upon initialisation
+	private double t; // private variable storing the parameter T, updated upon initialisation
 	private int n; // private variable storing the parameter n, updated upon initialisation
 	private int syncCount; // private variable to control the number of remaining beacon frames to be sent within an iteration of the protocol
 
@@ -67,7 +67,7 @@ public class TDMAnchor extends TypedAtomicActor{
 		output.setTypeEquals(BaseType.INT);
 
 		//parameter instantiation, setting default values
-		pt = new Parameter(this,"t");
+		pt = new Parameter(this,"T");
 		pt.setExpression("0.5");
 
 		pn = new Parameter(this,"n");
@@ -145,7 +145,7 @@ public class TDMAnchor extends TypedAtomicActor{
 		else if(state==TDMAnchor.SYNC){ // transition from sync to rx
 //            System.out.println(String.format("Sink is receiving at time: %s", getDirector().getModelTime()));
 			state = TDMAnchor.RX;
-			nextFire = getDirector().getModelTime().add(t); // next scheduled firing in t time units
+			nextFire = getDirector().getModelTime().add(t); // next scheduled firing in T time units
 			getDirector().fireAt(this, nextFire);
 
 		}
@@ -154,7 +154,7 @@ public class TDMAnchor extends TypedAtomicActor{
 			this.setLED(TDMAnchor.BLACK);			// turn off the LED
 
 			state = TDMAnchor.SLEEP;
-			nextFire = getDirector().getModelTime().add(10*t); // next scheduled firing in 10*t time units
+			nextFire = getDirector().getModelTime().add(10*t); // next scheduled firing in 10*T time units
 			getDirector().fireAt(this, nextFire);
 
 		}
