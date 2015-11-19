@@ -11,6 +11,7 @@ public class Sink{
     public int numTransmitted = 0;
     public Set<SinkProperties> possibleProperties;
     public boolean completed = false;
+    public int plannedBroadcasts;
 
     public Sink(int channel) {
         this.channel = channel;

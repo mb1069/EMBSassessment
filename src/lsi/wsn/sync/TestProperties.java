@@ -12,14 +12,29 @@ public class TestProperties {
     public static final double P_MAX = (11+N_MAX)*T_MAX;
 
     public static void main(String[] args) throws Exception {
-        Beacon a = new Beacon(14.0, 1);
-        Beacon b = new Beacon(20.0, 4);
+        Beacon a = new Beacon(18.7, 2);
+        Beacon b = new Beacon(39, 5);
         Beacon c = new Beacon(13.5, 6);
         Set<SinkProperties> sps = generatePossibleSinkProperties(a, b);
+        System.out.println(getEarliestPossibleBeacon(sps, b));
         Set<SinkProperties> sps2 = generatePossibleSinkProperties(a,c);
         System.out.println(sps);
         System.out.println(sps2);
         System.out.println(spIntersection(sps, sps2));
+    }
+    private static double getEarliestPossibleBeacon(Set<SinkProperties> setSP, Beacon latestBeacon){
+        double shortestPeriod = Double.MAX_VALUE;
+        int possibleN = 0;
+        int latestN = latestBeacon.n;
+        for (SinkProperties sp: setSP){
+            double potentialPeriod = (11+sp.n)*sp.t;
+            if (potentialPeriod<shortestPeriod){
+                shortestPeriod = potentialPeriod;
+                possibleN = sp.n;
+            }
+        }
+        //CurrentTime - diffN (to go to start of series) + sleep/receive period * estimated short period
+        return latestBeacon.t+((11+possibleN-latestN)*(shortestPeriod/(11+possibleN)));
     }
 
     private static Set<SinkProperties> spIntersection(Set<SinkProperties> setA, Set<SinkProperties> setB){

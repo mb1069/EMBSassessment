@@ -145,7 +145,7 @@ public class TDMAnchor extends TypedAtomicActor{
 				wrongReceived++;
 				
 			}
-			System.out.println("CORRECT RECEIVE "+correctReceived + "/"+wrongReceived);
+			System.out.println("RECEIVE "+correctReceived + "/"+wrongReceived);
 		}
 		
 	}
