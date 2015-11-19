@@ -18,7 +18,7 @@ public class MyNode extends TypedAtomicActor {
     protected TypedIOPort feedbackOutput;
     protected TypedIOPort channelOutput;
     protected ArrayList<ChannelSwitch> channelSwitches = new ArrayList<ChannelSwitch>();
-    protected int currentChannel = 11;
+    protected int currentChannel = 15;
     protected int[] channels = {11, 12, 13, 14, 15};
     protected HashMap<Integer, Sink> sinks = new HashMap<Integer, Sink>();
     protected ArrayList<Broadcast> broadcasts = new ArrayList<Broadcast>();
@@ -122,10 +122,10 @@ public class MyNode extends TypedAtomicActor {
                     if (sinks.get(currentChannel).plannedBroadcasts<2) {
                         create2ndBroadcastUsingPreviousBroadcast(broadcast, sinks.get(currentChannel).T, currentChannel, sinks.get(currentChannel).N);
                     }
-                    setChannel(pickNextChannel(currentChannel), currentTime);
+                    setChannel(pickNextChannel(currentChannel, currentTime), currentTime);
                 }
             }
-            int newChannel = pickNextChannel(currentChannel);
+            int newChannel = pickNextChannel(currentChannel, currentTime);
             if (newChannel!=currentChannel) {
                 // If broadcasts are all sorted for channel, do not return to it
                 if (sinks.get(currentChannel).plannedBroadcasts==2){
@@ -137,11 +137,11 @@ public class MyNode extends TypedAtomicActor {
                     setChannel(newChannel, currentTime);
                     // Quick switchback to receive subsequent beacon
                 } else if (sinks.get(currentChannel).beacons.size()==1 && b.n!=1){
-                    createChannelSwitchCallBack(currentTime+T_MIN, currentChannel);
+                    createChannelSwitchCallBack(currentTime+(T_MIN-microDelay), currentChannel);
                     setChannel(newChannel, currentTime);
                     // Long sleep if channel about to enter sleep period
                 } else if (sinks.get(currentChannel).beacons.size()==1 && b.n==1){
-                    createChannelSwitchCallBack(currentTime+(11*T_MIN), currentChannel);
+                    createChannelSwitchCallBack(currentTime+(11*(T_MIN-microDelay)), currentChannel);
                     setChannel(newChannel, currentTime);
                 }
             }
@@ -226,18 +226,20 @@ public class MyNode extends TypedAtomicActor {
     }
 
 
-    private int pickNextChannel(int currentChannel) {
+    private int pickNextChannel(int currentChannel, double currentTime) {
         for (Sink s : sinks.values()) {
-            if (sinks.get(s.channel).plannedBroadcasts<2 && s.channel!=currentChannel) {
+            if (!channelHasPendingSC(s.channel, currentTime) &&sinks.get(s.channel).plannedBroadcasts<2 && s.channel!=currentChannel) {
                 return s.channel;
             }
         }
         return currentChannel;
     }
 
-    private boolean channelHasPendingBroadcast(int channel) {
-        for (Broadcast b : broadcasts) {
-            if (b.channel == channel) {
+
+    // If channel has pending switch, it is currently in sleep mode
+    private boolean channelHasPendingSC(int channel, double currentTime) {
+        for (ChannelSwitch sc : channelSwitches) {
+            if (sc.channel == channel && sc.time-currentTime>T_MAX) {
                 return true;
             }
         }
