@@ -55,7 +55,7 @@ public class MyNode extends TypedAtomicActor {
         // If any broadcasts need to be done
         currentTime = round(currentTime);
         ArrayList<Broadcast> broadcastsAtTime = timeInBroadcasts(currentTime, broadcasts);
-        if (currentTime==42.9){
+        if (currentTime==23.4){
             System.out.println();
         }
         if (broadcastsAtTime.size() > 0) {
@@ -72,8 +72,6 @@ public class MyNode extends TypedAtomicActor {
         }
 
         //TODO remove this
-
-
         //Process tokens
         if (input.hasToken(0) && sinks.containsKey(currentChannel)) {
             sinks.get(currentChannel).lastBeaconTime = currentTime;
@@ -234,7 +232,7 @@ public class MyNode extends TypedAtomicActor {
 
     private int pickNextChannel(int currentChannel, double currentTime) {
         for (Sink s : sinks.values()) {
-            if (!channelHasPendingSC(s.channel, currentTime) &&sinks.get(s.channel).plannedBroadcasts<2 && s.channel!=currentChannel) {
+            if (!channelHasPendingSC(s.channel, currentTime) && sinks.get(s.channel).plannedBroadcasts<2 && s.channel!=currentChannel) {
                 return s.channel;
             }
         }
@@ -268,7 +266,7 @@ public class MyNode extends TypedAtomicActor {
     }
 
     private void create2ndBroadcastUsingPeriod(Beacon b, int channel, double t, int N) throws IllegalActionException {
-        double broadcast = (((N+11)+b.n) * t) + b.t;
+        double broadcast = round((((N+11)+b.n) * t) + b.t);
         double deadline = broadcast + t;
         if (setupBroadcastAndCallBack(broadcast, deadline, channel)) {
             sinks.get(currentChannel).completed = true;
