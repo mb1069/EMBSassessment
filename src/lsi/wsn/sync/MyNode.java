@@ -1,5 +1,4 @@
 package lsi.wsn.sync;
-//   lsi.wsn.sync.MyNode
 
 import ptolemy.actor.TypedAtomicActor;
 import ptolemy.actor.TypedIOPort;
@@ -18,7 +17,7 @@ public class MyNode extends TypedAtomicActor {
     protected TypedIOPort feedbackOutput;
     protected TypedIOPort channelOutput;
     protected ArrayList<ChannelSwitch> channelSwitches = new ArrayList<ChannelSwitch>();
-    protected int currentChannel = 12;
+    protected int currentChannel = 11;
     protected int[] channels = {11, 12, 13, 14, 15};
     protected HashMap<Integer, Sink> sinks = new HashMap<Integer, Sink>();
     protected ArrayList<Broadcast> broadcasts = new ArrayList<Broadcast>();
@@ -100,11 +99,11 @@ public class MyNode extends TypedAtomicActor {
 
 
             ArrayList<Beacon> beacons = sinks.get(currentChannel).beacons;
-            //If last two beacons have consecutive numbers and arrived within x T_MAX
+            //If last two beacons have consecutive numbers and arrived within diffN*T_MAX
             if (beacons.size()>2){
                 int diffN = beacons.get(numBeacons-2).n-beacons.get(numBeacons-1).n;
                 double diffT = Math.abs(beacons.get(numBeacons-2).t-beacons.get(numBeacons-1).t);
-                if (diffN>0 && diffT<=(T_MAX*diffN)){
+                if (diffN>0 && diffT<=(T_MAX*diffN) && diffT<=(N_MAX-1)*T_MAX){
                     sinks.get(currentChannel).T = round(diffT/diffN);
                 }
             }
@@ -113,30 +112,22 @@ public class MyNode extends TypedAtomicActor {
             //Special case for beacons with same n and channel with known N
             if (numBeacons==2 && beaconsHaveSameN(beacons) && sinks.get(currentChannel).N!=null && latestBeaconsWithinMaxCyclePeriod(sinks.get(currentChannel).beacons, numBeacons) && sinks.get(currentChannel).plannedBroadcasts<2){
                 sinks.get(currentChannel).T = round((Math.abs(beacons.get(numBeacons-1).t - beacons.get(numBeacons-2).t))/(11+b.n));
-                double broadcastTime = createNextPossibleBroadcast(b, currentChannel, sinks.get(currentChannel).T, currentTime);
-                create2ndBroadcastUsingPreviousBroadcast(broadcastTime, sinks.get(currentChannel).T, currentChannel, sinks.get(currentChannel).N);
             }
 
-//            // If 2 beacons were part of the same series -> establish T, create 1 broadcast
-//            if (numBeacons==2 && latestBeaconsWithinPeriod(sinks.get(currentChannel).beacons, numBeacons) && sinks.get(currentChannel).plannedBroadcasts<2){
-//                double nDiff = (beacons.get(numBeacons-2).n-beacons.get(numBeacons-1).n);
-//                sinks.get(currentChannel).T = round((Math.abs(beacons.get(numBeacons-1).t - beacons.get(numBeacons-2).t))/nDiff);
-//                createNextPossibleBroadcast(b, currentChannel, sinks.get(currentChannel).T, currentTime);
-//            }
 
 
-            // If both N and T are known, can create the 2nd broadcast if needed
+            // If both N and T are known, can create the 2nd broadcast
             if (sinks.get(currentChannel).plannedBroadcasts<2 && sinks.get(currentChannel).N!=null && sinks.get(currentChannel).T!=null){
                 System.out.println("N AND T KNOWN: " + sinks.get(currentChannel).plannedBroadcasts);
+                createNextPossibleBroadcast(b, currentChannel, sinks.get(currentChannel).T, currentTime);
                 create2ndBroadcastUsingPeriod(b, currentChannel, sinks.get(currentChannel).T, sinks.get(currentChannel).N);
             }
+
+
 
             // If more than 2 beacons available and broadcasts needed, can generate possible combinations of T and N
             if (sinks.get(currentChannel).beacons.size() > 1 && sinks.get(currentChannel).plannedBroadcasts<2) {
                 // Generate compatible combinations of T and N for latest pair of beacons
-                if (currentTime == 40.8){
-                    System.out.println(" ");
-                }
 
                 Set<SinkProperties> sps = generatePossibleSinkProperties(sinks.get(currentChannel).beacons.get(numBeacons - 2), sinks.get(currentChannel).beacons.get(numBeacons - 1), sinks.get(currentChannel).N, sinks.get(currentChannel).T);
                 if (sinks.get(currentChannel).possibleProperties == null) {
@@ -155,9 +146,7 @@ public class MyNode extends TypedAtomicActor {
                     }
                 }
             }
-            if (currentTime==12.1){
-                System.out.println(" ");
-            }
+
             int newChannel = pickNextChannel(currentChannel, currentTime);
             if (newChannel!=currentChannel) {
                 // If broadcasts are all sorted for channel, do not return to it
@@ -274,8 +263,7 @@ public class MyNode extends TypedAtomicActor {
                 feedbackOutput.send(0, new IntToken(666));
                 try {
                     sinks.get(b.channel).numTransmitted++;
-                } catch (NullPointerException ignored) {
-                }
+                } catch (NullPointerException ignored) {}
                 fired.add(b);
             }
         }
