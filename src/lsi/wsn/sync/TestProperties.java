@@ -12,12 +12,12 @@ public class TestProperties {
     public static final double P_MAX = (11+N_MAX)*T_MAX;
 
     public static void main(String[] args) throws Exception {
-        Beacon a = new Beacon(18.7, 2);
-        Beacon b = new Beacon(39, 5);
-        Beacon c = new Beacon(13.5, 6);
+        Beacon a = new Beacon(12, 2);
+        Beacon b = new Beacon(26.4, 2);
+        Beacon c = new Beacon(40.8, 2);
         Set<SinkProperties> sps = generatePossibleSinkProperties(a, b);
         System.out.println(getEarliestPossibleBeacon(sps, b));
-        Set<SinkProperties> sps2 = generatePossibleSinkProperties(a,c);
+        Set<SinkProperties> sps2 = generatePossibleSinkProperties(b,c);
         System.out.println(sps);
         System.out.println(sps2);
         System.out.println(spIntersection(sps, sps2));
