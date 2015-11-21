@@ -18,7 +18,7 @@ public class MyNode extends TypedAtomicActor {
     protected TypedIOPort feedbackOutput;
     protected TypedIOPort channelOutput;
     protected ArrayList<ChannelSwitch> channelSwitches = new ArrayList<ChannelSwitch>();
-    protected int currentChannel = 11;
+    protected int currentChannel = 12;
     protected int[] channels = {11, 12, 13, 14, 15};
     protected HashMap<Integer, Sink> sinks = new HashMap<Integer, Sink>();
     protected ArrayList<Broadcast> broadcasts = new ArrayList<Broadcast>();
@@ -72,7 +72,7 @@ public class MyNode extends TypedAtomicActor {
             setChannel(cs.channel, currentTime);
         }
 
-        if (currentTime==26.4){
+        if (currentTime==12.1){
             System.out.println("");
         }
 
@@ -98,13 +98,31 @@ public class MyNode extends TypedAtomicActor {
                 System.out.println(" ");
             }
 
+
             ArrayList<Beacon> beacons = sinks.get(currentChannel).beacons;
+            //If last two beacons have consecutive numbers and arrived within x T_MAX
+            if (beacons.size()>2){
+                int diffN = beacons.get(numBeacons-2).n-beacons.get(numBeacons-1).n;
+                double diffT = Math.abs(beacons.get(numBeacons-2).t-beacons.get(numBeacons-1).t);
+                if (diffN>0 && diffT<=(T_MAX*diffN)){
+                    sinks.get(currentChannel).T = round(diffT/diffN);
+                }
+            }
+
+
             //Special case for beacons with same n and channel with known N
             if (numBeacons==2 && beaconsHaveSameN(beacons) && sinks.get(currentChannel).N!=null && latestBeaconsWithinMaxCyclePeriod(sinks.get(currentChannel).beacons, numBeacons) && sinks.get(currentChannel).plannedBroadcasts<2){
                 sinks.get(currentChannel).T = round((Math.abs(beacons.get(numBeacons-1).t - beacons.get(numBeacons-2).t))/(11+b.n));
                 double broadcastTime = createNextPossibleBroadcast(b, currentChannel, sinks.get(currentChannel).T, currentTime);
                 create2ndBroadcastUsingPreviousBroadcast(broadcastTime, sinks.get(currentChannel).T, currentChannel, sinks.get(currentChannel).N);
             }
+
+//            // If 2 beacons were part of the same series -> establish T, create 1 broadcast
+//            if (numBeacons==2 && latestBeaconsWithinPeriod(sinks.get(currentChannel).beacons, numBeacons) && sinks.get(currentChannel).plannedBroadcasts<2){
+//                double nDiff = (beacons.get(numBeacons-2).n-beacons.get(numBeacons-1).n);
+//                sinks.get(currentChannel).T = round((Math.abs(beacons.get(numBeacons-1).t - beacons.get(numBeacons-2).t))/nDiff);
+//                createNextPossibleBroadcast(b, currentChannel, sinks.get(currentChannel).T, currentTime);
+//            }
 
 
             // If both N and T are known, can create the 2nd broadcast if needed
@@ -120,7 +138,7 @@ public class MyNode extends TypedAtomicActor {
                     System.out.println(" ");
                 }
 
-                Set<SinkProperties> sps = generatePossibleSinkProperties(sinks.get(currentChannel).beacons.get(numBeacons - 2), sinks.get(currentChannel).beacons.get(numBeacons - 1), sinks.get(currentChannel).N);
+                Set<SinkProperties> sps = generatePossibleSinkProperties(sinks.get(currentChannel).beacons.get(numBeacons - 2), sinks.get(currentChannel).beacons.get(numBeacons - 1), sinks.get(currentChannel).N, sinks.get(currentChannel).T);
                 if (sinks.get(currentChannel).possibleProperties == null) {
                     sinks.get(currentChannel).possibleProperties = sps;
                 } else {
@@ -136,6 +154,9 @@ public class MyNode extends TypedAtomicActor {
                         create2ndBroadcastUsingPreviousBroadcast(broadcast, sinks.get(currentChannel).T, currentChannel, sinks.get(currentChannel).N);
                     }
                 }
+            }
+            if (currentTime==12.1){
+                System.out.println(" ");
             }
             int newChannel = pickNextChannel(currentChannel, currentTime);
             if (newChannel!=currentChannel) {
@@ -178,6 +199,12 @@ public class MyNode extends TypedAtomicActor {
         return timeDiff<=(T_MAX*(11+nDiff));
     }
 
+    private boolean latestBeaconsWithinPeriod(ArrayList<Beacon> beacons, int numBeacons) {
+        double timeDiff = Math.abs(beacons.get(numBeacons - 1).t - beacons.get(numBeacons - 2).t);
+        double nDiff = (beacons.get(numBeacons-2).n-beacons.get(numBeacons-1).n);
+        return timeDiff<=(T_MAX*nDiff);
+    }
+
     private double getEarliestPossibleBeacon(Set<SinkProperties> setSP, Beacon latestBeacon){
         double shortestPeriod = Double.MAX_VALUE;
         int possibleN = 0;
@@ -193,7 +220,7 @@ public class MyNode extends TypedAtomicActor {
         return round(latestBeacon.t+((11+possibleN-latestN)*(shortestPeriod/(11+possibleN))));
     }
 
-    private HashSet<SinkProperties> generatePossibleSinkProperties(Beacon b1, Beacon b2, Integer N) {
+    private HashSet<SinkProperties> generatePossibleSinkProperties(Beacon b1, Beacon b2, Integer N, Double T) {
 
         HashSet<SinkProperties> sps = new HashSet<SinkProperties>();
         double diffT = Math.abs(b2.t-b1.t);
@@ -209,7 +236,11 @@ public class MyNode extends TypedAtomicActor {
                 double period = diffT/(double)(((11+n)*i)+diffN);
                 if (T_MIN <=period && period <=T_MAX) {
                     if (N == null) {
-                        sps.add(new SinkProperties(n, round(period)));
+                        if (T == null) {
+                            sps.add(new SinkProperties(n, round(period)));
+                        } else if (round(period)==T){
+                            sps.add(new SinkProperties(n, round(period)));
+                        }
                     } else if (n==N){
                         sps.add(new SinkProperties(n, round(period)));
                     }
