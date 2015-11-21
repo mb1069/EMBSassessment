@@ -228,5 +228,7 @@ public class TDMAnchor extends TypedAtomicActor{
 		node_icon.setPersistent(false);
 	}
 
-	
+	protected String getResults(){
+		return correctReceived+"/"+wrongReceived;
+	}
 }

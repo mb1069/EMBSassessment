@@ -1,8 +1,5 @@
 package lsi.wsn.sync;
 
-/**
- * Created by mb1069 on 19/11/2015.
- */
 public class SinkProperties{
     int n;
     double t;

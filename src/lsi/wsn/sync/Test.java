@@ -1,8 +1,10 @@
 package lsi.wsn.sync;
 
+import ptolemy.actor.TypedCompositeActor;
 import ptolemy.actor.gui.PtExecuteApplication;
 import java.io.File;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -13,14 +15,15 @@ public class Test {
                 "src"+ File.separator+"model.xml"
         });
 
-//        List entities = ((TypedCompositeActor)ptExec.models().get(1)).deepEntityList();
-//        for(Object entity : entities) {
-//            if(entity instanceof TDMAnchor){
-//                TDMAnchor e = (TDMAnchor)entity;
-//                e.setN("5");
-//                e.setT("8");
-//            }
-//        }
+
         ptExec.runModels();
         ptExec.waitForFinish();
+        List entities = ((TypedCompositeActor)ptExec.models().get(1)).deepEntityList();
+
+        for(Object entity : entities) {
+            if(entity instanceof TDMAnchor){
+                TDMAnchor e = (TDMAnchor)entity;
+                System.out.println(e.getResults());
+            }
+        }
     }}

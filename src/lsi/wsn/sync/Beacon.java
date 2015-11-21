@@ -1,8 +1,5 @@
 package lsi.wsn.sync;
 
-/**
- * Created by mb1069 on 16/11/2015.
- */
 import ptolemy.actor.util.Time;
 public class Beacon {
     public double t;

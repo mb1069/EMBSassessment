@@ -27,4 +27,3 @@ Receive beacon:
 	else
 		Record beacon
 		Make callback to come back to channel
-		

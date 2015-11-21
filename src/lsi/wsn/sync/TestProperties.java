@@ -55,7 +55,6 @@ public class TestProperties {
         int diffN = b1.n-b2.n;
 
         int maxObservedN = Math.max(b1.n, b2.n);
-        int maxI = (int) Math.floor(diffT/(11*T_MIN));
 
         for (int i=0; i<=18; i++){
             for (int n=maxObservedN; n<=N_MAX; n++){
