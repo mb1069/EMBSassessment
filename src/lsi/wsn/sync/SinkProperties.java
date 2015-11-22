@@ -1,11 +1,28 @@
 package lsi.wsn.sync;
 
+/**
+ * Represents a possible tuple (n, t) for a configuration of a sink
+ */
 public class SinkProperties{
-    int n;
-    double t;
+    private int n; // n: Number of beacons sent by sink per cycle
+    private double t; // t: interval between consecutive beacon in range [0.5, 1.5]
 
     public SinkProperties(int n, double t) {
         this.n = n;
+        this.t = t;
+    }
+
+    public int getN() {
+        return n;
+    }
+    public void setN(int n) {
+        this.n = n;
+    }
+
+    public double getT() {
+        return t;
+    }
+    public void setT(double t) {
         this.t = t;
     }
 

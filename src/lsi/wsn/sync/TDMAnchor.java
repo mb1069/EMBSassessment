@@ -53,8 +53,8 @@ public class TDMAnchor extends TypedAtomicActor{
 	protected String iconColor = "{0.0, 0.0, 0.0, 1.0}"; // black, LED off by default
 	protected EllipseAttribute _circle; 
 	protected EditorIcon node_icon;
-	private int correctReceived = 0;
-	private int wrongReceived = 0;
+	private int correctReceived = 0; // represents the number of transmissions received in a valid interval by the sink
+	private int wrongReceived = 0; // represents the number of transmissions received at the incorrect time by the sink
 
 
 	public TDMAnchor(CompositeEntity container, String name)
