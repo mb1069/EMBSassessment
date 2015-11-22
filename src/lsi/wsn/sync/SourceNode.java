@@ -12,7 +12,7 @@ import ptolemy.kernel.util.NameDuplicationException;
 import java.util.*;
 
 /**
- * Class representing the
+ * Class representing the sourceNode communicating with all sinks
  */
 public class SourceNode extends TypedAtomicActor {
     protected TypedIOPort input; // input port
