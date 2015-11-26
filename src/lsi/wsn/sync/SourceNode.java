@@ -77,7 +77,7 @@ public class SourceNode extends TypedAtomicActor {
         }
 
         // Process 1 token if available
-        if (input.hasToken(0) && sinks.containsKey(currentChannel)) {
+        if (input.hasToken(0)) {
             Token countToken = input.get(0);
             Beacon b = new Beacon(currentTime, ((IntToken) countToken).intValue());
             sinks.get(currentChannel).getBeacons().add(b);
@@ -109,7 +109,10 @@ public class SourceNode extends TypedAtomicActor {
 
             // Special case for beacons with same n and channel with known N -> establish T, and create broadcasts using following if statement
             if (numBeacons>1 && beaconsHaveSameN(beacons) && sinks.get(currentChannel).getN()!=null && latestBeaconsWithinMaxCyclePeriod(beacons) && sinks.get(currentChannel).getPlannedBroadcasts()<2){
-                sinks.get(currentChannel).setT(round((Math.abs(beacons.get(numBeacons-1).t - beacons.get(numBeacons-2).t))/(11+b.n)));
+                double T = round((Math.abs(beacons.get(numBeacons-1).t - beacons.get(numBeacons-2).t))/(11+b.n));
+                if (validPeriod(T)) {
+                    sinks.get(currentChannel).setT(T);
+                }
             }
 
             // If both N and T are known, can create the 2nd broadcast
@@ -182,6 +185,15 @@ public class SourceNode extends TypedAtomicActor {
             }
         }
 
+    }
+
+    /**
+     * Verify calculated period is within [T_MIN, T_MAX]
+     * @param t: period to validate
+     * @return true if T in inclusive interval [T_MIN, T_MAX]
+     */
+    private boolean validPeriod(double t) {
+        return T_MIN<=t && t<=T_MAX;
     }
 
     /**

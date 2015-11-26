@@ -17,8 +17,6 @@ public class Sink{
     private int plannedBroadcasts = 0; // plannedBroadcasts: number of scheduled broadcasts to this sink
     private double lastBeaconTime; // lastBeaconTime: time at which the last beacon was received on this channel
 
-
-
     public Sink(int channel) {
         this.channel = channel;
     }
